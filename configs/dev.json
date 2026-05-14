@@ -1,0 +1,11 @@
+{
+  "app_name": "qq-ai-bot",
+  "environment": "development",
+  "log_level": "INFO",
+  "http": {
+    "host": "127.0.0.1",
+    "port": 8000,
+    "health_path": "/healthz"
+  },
+  "providers": {}
+}

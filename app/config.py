@@ -17,6 +17,7 @@ class HTTPConfig:
     host: str
     port: int
     health_path: str
+    shutdown_timeout: float
 
 
 @dataclass(frozen=True)
@@ -58,6 +59,7 @@ class ConfigLoader:
                 "host": "127.0.0.1",
                 "port": 8000,
                 "health_path": "/healthz",
+                "shutdown_timeout": 5.0,
             },
             "providers": {},
         }
@@ -112,6 +114,14 @@ class ConfigLoader:
                 raise ConfigError(f"APP_HTTP_PORT must be an integer: {port_value}") from exc
         if "APP_HTTP_HEALTH_PATH" in environ:
             overrides.setdefault("http", {})["health_path"] = environ["APP_HTTP_HEALTH_PATH"]
+        if "APP_HTTP_SHUTDOWN_TIMEOUT" in environ:
+            timeout_value = environ["APP_HTTP_SHUTDOWN_TIMEOUT"]
+            try:
+                overrides.setdefault("http", {})["shutdown_timeout"] = float(timeout_value)
+            except ValueError as exc:
+                raise ConfigError(
+                    f"APP_HTTP_SHUTDOWN_TIMEOUT must be a number: {timeout_value}"
+                ) from exc
 
         return overrides
 
@@ -147,6 +157,7 @@ class ConfigLoader:
         host = http.get("host")
         port = http.get("port")
         health_path = http.get("health_path")
+        shutdown_timeout = http.get("shutdown_timeout")
 
         if not isinstance(host, str) or not host.strip():
             raise ConfigError("http.host must be a non-empty string")
@@ -154,11 +165,18 @@ class ConfigLoader:
             raise ConfigError("http.port must be an integer between 0 and 65535")
         if not isinstance(health_path, str) or not health_path.startswith("/"):
             raise ConfigError("http.health_path must be a string starting with '/'")
+        if not isinstance(shutdown_timeout, (int, float)) or shutdown_timeout <= 0:
+            raise ConfigError("http.shutdown_timeout must be a positive number")
 
         return AppConfig(
             app_name=app_name.strip(),
             environment=environment.strip(),
             log_level=log_level.upper(),
-            http=HTTPConfig(host=host.strip(), port=port, health_path=health_path),
+            http=HTTPConfig(
+                host=host.strip(),
+                port=port,
+                health_path=health_path,
+                shutdown_timeout=float(shutdown_timeout),
+            ),
             providers=providers,
         )

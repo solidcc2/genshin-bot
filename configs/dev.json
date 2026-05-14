@@ -5,7 +5,8 @@
   "http": {
     "host": "127.0.0.1",
     "port": 8000,
-    "health_path": "/healthz"
+    "health_path": "/healthz",
+    "shutdown_timeout": 5.0
   },
   "providers": {}
 }

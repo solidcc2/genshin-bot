@@ -7,6 +7,16 @@ name = "qq-ai-bot"
 version = "0.1.0"
 description = "QQ AI bot prototype runtime skeleton"
 requires-python = ">=3.10"
+dependencies = [
+  "fastapi",
+  "uvicorn",
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx",
+  "pytest",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

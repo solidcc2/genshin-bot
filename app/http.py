@@ -1,60 +1,105 @@
 from __future__ import annotations
 
-import json
+import asyncio
 import logging
-import threading
-from http import HTTPStatus
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from collections.abc import Callable
+from typing import Any
 
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+import uvicorn
+
+from app.config import AppConfig
 from app.errors import HealthServiceError
 from app.runtime import AppContext
+
+
+class UvicornServerRunner:
+    def __init__(self, app: FastAPI, config: AppConfig) -> None:
+        self._app = app
+        self._config = config
+        self._server: uvicorn.Server | None = None
+        self._task: asyncio.Task[None] | None = None
+
+    async def start(self) -> tuple[str, int]:
+        uvicorn_config = uvicorn.Config(
+            app=self._app,
+            host=self._config.http.host,
+            port=self._config.http.port,
+            log_level=self._config.log_level.lower(),
+            access_log=False,
+            lifespan="off",
+        )
+        self._server = uvicorn.Server(uvicorn_config)
+        self._server.install_signal_handlers = lambda: None
+        self._task = asyncio.create_task(self._server.serve())
+
+        for _ in range(500):
+            if self._server.started:
+                return self._resolve_bound_address()
+            if self._task.done():
+                await self._await_server_task()
+                break
+            await asyncio.sleep(0.01)
+
+        raise HealthServiceError("timed out while starting health service")
+
+    async def stop(self) -> None:
+        if self._server is None:
+            return
+
+        self._server.should_exit = True
+        if self._task is not None:
+            await asyncio.wait_for(
+                self._await_server_task(),
+                timeout=self._config.http.shutdown_timeout,
+            )
+        self._task = None
+        self._server = None
+
+    async def _await_server_task(self) -> None:
+        assert self._task is not None
+        try:
+            await self._task
+        except OSError as exc:
+            raise HealthServiceError(f"failed to start health service: {exc}") from exc
+        except Exception as exc:
+            raise HealthServiceError(f"health service failed unexpectedly: {exc}") from exc
+
+    def _resolve_bound_address(self) -> tuple[str, int]:
+        assert self._server is not None
+        servers = getattr(self._server, "servers", None) or []
+        if not servers or not servers[0].sockets:
+            raise HealthServiceError("health service started without an accessible socket")
+        socket = servers[0].sockets[0]
+        host, port = socket.getsockname()[:2]
+        return str(host), int(port)
 
 
 class HealthService:
     def __init__(
         self,
         context: AppContext,
-        server_class: type[ThreadingHTTPServer] | None = None,
+        runner_factory: Callable[[FastAPI, AppConfig], Any] | None = None,
     ) -> None:
         self._context = context
         self._logger = logging.getLogger("qq_ai_bot.health")
-        self._server_class = server_class or ThreadingHTTPServer
-        self._server: ThreadingHTTPServer | None = None
-        self._thread: threading.Thread | None = None
+        self._app = create_health_app(context)
+        factory = runner_factory or UvicornServerRunner
+        self._runner = factory(self._app, self._context.config)
 
-    def start(self) -> tuple[str, int]:
-        if self._server is not None:
-            raise RuntimeError("Health service already started")
+    @property
+    def asgi_app(self) -> FastAPI:
+        return self._app
 
-        handler = _build_handler(self._context, self._context.config.http.health_path)
-        try:
-            self._server = self._server_class(
-                (self._context.config.http.host, self._context.config.http.port),
-                handler,
-            )
-        except OSError as exc:
-            raise HealthServiceError(f"failed to start health service: {exc}") from exc
-        self._thread = threading.Thread(
-            target=self._server.serve_forever,
-            name="health-http-server",
-            daemon=True,
-        )
-        self._thread.start()
-        host, port = self._server.server_address[:2]
+    async def start(self) -> tuple[str, int]:
+        host, port = await self._runner.start()
         self._logger.info("health service started on %s:%s", host, port)
-        return str(host), int(port)
+        return host, port
 
-    def stop(self) -> None:
-        if self._server is None:
-            return
-
-        self._server.shutdown()
-        self._server.server_close()
-        if self._thread is not None:
-            self._thread.join(timeout=2)
+    async def stop(self) -> None:
+        await self._runner.stop()
         self._logger.info("health service stopped")
-        self._thread = None
-        self._server = None
 
 
 def build_health_payload(context: AppContext) -> dict[str, object]:
@@ -69,28 +114,11 @@ def build_health_payload(context: AppContext) -> dict[str, object]:
     }
 
 
-def _build_handler(
-    context: AppContext,
-    health_path: str,
-) -> type[BaseHTTPRequestHandler]:
-    class HealthRequestHandler(BaseHTTPRequestHandler):
-        def do_GET(self) -> None:  # noqa: N802
-            if self.path != health_path:
-                self._send_json(HTTPStatus.NOT_FOUND, {"status": "not_found"})
-                return
+def create_health_app(context: AppContext) -> FastAPI:
+    app = FastAPI()
 
-            payload = build_health_payload(context)
-            self._send_json(HTTPStatus.OK, payload)
+    @app.get(context.config.http.health_path)
+    async def healthz() -> JSONResponse:
+        return JSONResponse(build_health_payload(context))
 
-        def log_message(self, format: str, *args: object) -> None:
-            return
-
-        def _send_json(self, status: HTTPStatus, payload: dict[str, object]) -> None:
-            body = json.dumps(payload, ensure_ascii=True).encode("utf-8")
-            self.send_response(status.value)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-
-    return HealthRequestHandler
+    return app

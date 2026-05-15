@@ -1,17 +1,13 @@
 from __future__ import annotations
 
-from app.event_model import NormalizedEvent
 from app.plugin import BotPlugin, PluginContext, PluginHelp, PluginResult, PluginRegistry
 
 
 class HelpPlugin(BotPlugin):
-    _TRIGGERS = frozenset({"/help"})
+    command = "help"
 
     def __init__(self, registry: PluginRegistry) -> None:
         self._registry = registry
-
-    def match(self, event: NormalizedEvent) -> bool:
-        return event.text.strip() in self._TRIGGERS
 
     async def handle(self, ctx: PluginContext) -> PluginResult:
         entries = self._registry.get_help_entries()

@@ -4,7 +4,6 @@ import logging
 
 from app.config import HoYoLABConfig
 from app.errors import NotBoundError
-from app.event_model import NormalizedEvent
 from app.plugin import BotPlugin, PluginContext, PluginHelp, PluginResult
 from app.providers.hoyolab import HoYoLABProvider
 from app.providers.hoyolab.models import QRLoginStatus
@@ -13,13 +12,11 @@ from app.storage import StorageProvider
 
 
 class HoyobindPlugin(BotPlugin):
+    command = "hoyobind"
     """QR code login to bind HoYoLAB cookies."""
 
     def __init__(self, provider: HoYoLABProvider) -> None:
         self._provider = provider
-
-    def match(self, event: NormalizedEvent) -> bool:
-        return event.text.strip() == "/hoyobind"
 
     async def handle(self, ctx: PluginContext) -> PluginResult:
         user_id = ctx.event.user_id
@@ -61,13 +58,11 @@ class HoyobindPlugin(BotPlugin):
 
 
 class HoyounbindPlugin(BotPlugin):
+    command = "hoyounbind"
     """Unbind HoYoLAB cookies."""
 
     def __init__(self, provider: HoYoLABProvider) -> None:
         self._provider = provider
-
-    def match(self, event: NormalizedEvent) -> bool:
-        return event.text.strip() == "/hoyounbind"
 
     async def handle(self, ctx: PluginContext) -> PluginResult:
         if not await self._provider.is_bound(ctx.event.user_id):
@@ -85,13 +80,11 @@ class HoyounbindPlugin(BotPlugin):
 
 
 class NotesPlugin(BotPlugin):
+    command = "notes"
     """Real-time notes (resin, expeditions, etc.)."""
 
     def __init__(self, provider: HoYoLABProvider) -> None:
         self._provider = provider
-
-    def match(self, event: NormalizedEvent) -> bool:
-        return event.text.strip() == "/notes"
 
     async def handle(self, ctx: PluginContext) -> PluginResult:
         try:
@@ -122,13 +115,11 @@ class NotesPlugin(BotPlugin):
 
 
 class SignPlugin(BotPlugin):
+    command = "sign"
     """Daily check-in."""
 
     def __init__(self, provider: HoYoLABProvider) -> None:
         self._provider = provider
-
-    def match(self, event: NormalizedEvent) -> bool:
-        return event.text.strip() == "/sign"
 
     async def handle(self, ctx: PluginContext) -> PluginResult:
         try:
@@ -152,22 +143,14 @@ class SignPlugin(BotPlugin):
 
 
 class StatsPlugin(BotPlugin):
+    command = "stats"
     """Battle chronicle summary."""
 
     def __init__(self, provider: HoYoLABProvider) -> None:
         self._provider = provider
 
-    def match(self, event: NormalizedEvent) -> bool:
-        text = event.text.strip()
-        if text == "/stats":
-            return True
-        if text.startswith("/stats "):
-            return True
-        return False
-
     async def handle(self, ctx: PluginContext) -> PluginResult:
-        parts = ctx.event.text.strip().split(maxsplit=1)
-        uid = parts[1] if len(parts) > 1 else None
+        uid = self._extract_args(ctx.event.text) or None
 
         try:
             result = await self._provider.get_battle_chronicle(ctx.event.user_id, uid=uid)

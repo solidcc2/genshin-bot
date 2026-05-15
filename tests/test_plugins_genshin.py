@@ -83,7 +83,7 @@ class TestHoyobindPlugin:
     async def test_match(self) -> None:
         plugin = HoyobindPlugin(AsyncMock())
         assert plugin.match(make_event("/hoyobind"))
-        assert not plugin.match(make_event("/hoyobind abc"))
+        assert plugin.match(make_event("/hoyobind abc"))
         assert not plugin.match(make_event("hoyobind"))
 
     @pytest.mark.anyio
@@ -148,7 +148,7 @@ class TestHoyounbindPlugin:
     async def test_match(self) -> None:
         plugin = HoyounbindPlugin(AsyncMock())
         assert plugin.match(make_event("/hoyounbind"))
-        assert not plugin.match(make_event("/hoyounbind extra"))
+        assert plugin.match(make_event("/hoyounbind extra"))
         assert not plugin.match(make_event("hoyounbind"))
 
     @pytest.mark.anyio
@@ -183,7 +183,7 @@ class TestNotesPlugin:
     async def test_match(self) -> None:
         plugin = NotesPlugin(AsyncMock())
         assert plugin.match(make_event("/notes"))
-        assert not plugin.match(make_event("/notes extra"))
+        assert plugin.match(make_event("/notes extra"))
         assert not plugin.match(make_event("notes"))
 
     @pytest.mark.anyio
@@ -221,7 +221,7 @@ class TestSignPlugin:
     async def test_match(self) -> None:
         plugin = SignPlugin(AsyncMock())
         assert plugin.match(make_event("/sign"))
-        assert not plugin.match(make_event("/sign extra"))
+        assert plugin.match(make_event("/sign extra"))
         assert not plugin.match(make_event("sign"))
 
     @pytest.mark.anyio

@@ -35,9 +35,21 @@ class PluginContext:
 
 
 class BotPlugin(ABC):
-    @abstractmethod
+    command: str = ""
+
     def match(self, event: NormalizedEvent) -> bool:
-        ...
+        if not self.command:
+            return False
+        text = event.text.strip()
+        prefix = "/" + self.command
+        return text == prefix or text.startswith(prefix + " ")
+
+    def _extract_args(self, text: str) -> str:
+        prefix = "/" + self.command
+        text = text.strip()
+        if text == prefix:
+            return ""
+        return text.removeprefix(prefix).strip()
 
     @abstractmethod
     async def handle(self, ctx: PluginContext) -> PluginResult:

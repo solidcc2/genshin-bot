@@ -1,23 +1,23 @@
 from __future__ import annotations
 
 from app.event_model import MessageSender, NormalizedEvent
-from app.plugin import BotPlugin, PluginContext, PluginResult
+from app.plugin import BotPlugin, PluginContext, PluginResult, PluginRegistry
 
 
 class Router:
-    def __init__(self) -> None:
-        self._plugins: list[BotPlugin] = []
+    def __init__(self, registry: PluginRegistry) -> None:
+        self._registry = registry
 
     def register(self, plugin: BotPlugin) -> None:
-        self._plugins.append(plugin)
+        self._registry.register(plugin)
 
     async def dispatch(
         self,
         event: NormalizedEvent,
         sender: MessageSender,
-    ) -> PluginResult | None:
-        for plugin in self._plugins:
+    ) -> PluginResult:
+        for plugin in self._registry.get_all():
             if plugin.match(event):
                 ctx = PluginContext(event=event, sender=sender)
                 return await plugin.handle(ctx)
-        return None
+        return PluginResult(text="未知命令。输入 /help 查看可用命令。")

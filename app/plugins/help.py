@@ -18,10 +18,19 @@ class HelpPlugin(BotPlugin):
         if not entries:
             return PluginResult(text="没有已注册的插件。")
 
-        lines = ["可用命令："]
+        groups: dict[str, list[PluginHelp]] = {}
         for entry in entries:
-            usage = f"  {entry.usage}" if entry.usage else ""
-            lines.append(f"  {entry.command} — {entry.description}{usage}")
+            groups.setdefault(entry.category, []).append(entry)
+
+        lines = ["可用命令："]
+        for category in sorted(groups, key=lambda c: (c != "通用", c)):
+            # 排序：非"通用"分类按字母序在前，"通用"分类始终最后
+            items = groups[category]
+            lines.append(f"\n[{category}]")
+            for entry in items:
+                usage = f" {entry.usage}" if entry.usage else ""
+                lines.append(f"  {entry.command} — {entry.description}{usage}")
+
         return PluginResult(text="\n".join(lines))
 
     def help(self) -> PluginHelp:

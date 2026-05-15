@@ -18,5 +18,37 @@ class HealthServiceError(BootstrapError):
     """Raised when the health HTTP service cannot be started."""
 
 
-class PluginError(BootstrapError):
+class AppError(Exception):
+    """Base error for runtime errors during normal operation."""
+
+
+class PluginError(AppError):
     """Raised when a plugin encounters an error during match or handle."""
+
+
+class StorageError(AppError):
+    """Raised when a storage operation fails."""
+
+
+class SessionError(AppError):
+    """Raised when a session operation fails."""
+
+
+class RateLimitError(AppError):
+    """Raised when the rate limiter encounters an error."""
+
+
+class HoyolabError(AppError):
+    """Base error for HoYoLAB provider operations."""
+
+
+class AuthError(HoyolabError):
+    """Raised when QR code login fails."""
+
+
+class ApiError(HoyolabError):
+    """Raised when a HoYoLAB API call fails."""
+
+
+class NotBoundError(HoyolabError):
+    """Raised when the user has no bound HoYoLAB cookies."""

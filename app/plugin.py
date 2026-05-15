@@ -21,6 +21,7 @@ class PluginHelp:
     command: str
     description: str
     usage: str | None = None
+    category: str = "通用"
 
 
 @dataclass

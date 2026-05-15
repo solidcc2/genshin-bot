@@ -244,6 +244,38 @@
   - 系统级验证“真实链路可用”
   - 人工冒烟级验证“最终链路真的能被人使用并观察到结果”
 
+## 代码审查待办补充记录（2026-05-15）
+
+以下条目来自 CP8 全仓库代码审查时发现但不属于当前阶段的问题，按所属 checkpoint 分组，指导后续 CP 开发时同步处理。
+
+### CP4（M2 QQ 接入）相关
+
+| # | 问题 | 说明 | 遗忘风险 |
+|---|------|------|----------|
+| L1 | `MessageDedupStore` 未连入 dispatch 流程 | 去重组件已实现（`app/dedup.py`），但 Router.dispatch 没有调用。CP4 接入 OneBot 时可能收到重复事件，需在 dispatch 入口处或 adapter 层接入去重 | 收到重复消息导致插件多次触发或 API 调用过量 |
+| L2 | `rate_limit` 列表膨胀无上限 | `RateLimiter.check` 每次调用追加时间戳到列表，不主动清理过期条目。当前流量低无影响，接入 QQ 后真实流量可能触发。<br>**评估修正（2026-05-15）：** `RateLimiter.check` 在写入前通过 `valid = [t for t in timestamps if t > cutoff]` 裁剪了过期条目，实际写入存储的只包含窗口内有效时间戳，所以不会无限增长。此条降级为观察项，无需主动修复。 | 存储用量随时间增长，不影响正确性但浪费空间 |
+
+### CP9（M11 Scheduler）相关
+
+| # | 问题 | 说明 | 遗忘风险 |
+|---|------|------|----------|
+| L3 | 自动签到定时任务 | `/sign` 当前是手动指令，适合作为定时任务自动执行。CP9 实现 Scheduler 时考虑将米游社签到注册为定时 job | 用户需要每天手动签到，产品体验不完整 |
+
+### CP10（M12+M13 观测与收口）相关
+
+| # | 问题 | 说明 | 遗忘风险 |
+|---|------|------|----------|
+| L4 | `AppContext` 瘦身 | 随着服务增多，`AppContext` 字段持续增长。建议 CP10 时 review 是否可将 storage、session_manager、rate_limiter 归入 `ServiceRegistry` | 上帝对象持续膨胀，模块边界模糊 |
+| L6 | `bootstrap._register_builtin_plugins` 拆分改名 | 当前函数名不副实：同时注册了 builtin 插件（echo/ping/help）和业务插件（genshin）。CP10 收口时应拆分为 `_register_core_plugins` + `_register_business_plugins`，由 bootstrap 上层编排 | 启动流程层次混乱，不利于后续 adapter 初始化编排 |
+| L7 | `genshin.Client` 资源管理 | `HoYoLABProvider._make_client` 每次 API 调用都创建新的 `genshin.Client` 但不调用 `close()`。短期被 GC 回收无害，长期可能泄漏 session 池。CP10 时加上上下文管理或 client 缓存/池化 | RuntimeWarning：coroutine close 未被 await |
+| L8 | `data/qrcodes/` QR 文件自动清理 | `start_qr_login` 保存二维码图片到磁盘但从不清理过期文件。CP10 实现定时清理策略（如超过 1 小时的 .png 文件删除）或接入存储层 TTL | 长期运行磁盘使用量持续增长 |
+
+### 跨 CP 通用
+
+| # | 问题 | 说明 | 遗忘风险 |
+|---|------|------|----------|
+| L5 | 新增 adapter 后的 `context.router` 非空保证 | `router: Router | None` 类型要求每次使用前检查。待有了明确的生命周期主线后（CP4+），可改为 `router: Router` 保证初始化 | 运行时意外出现 None 导致 AttributeError |
+
 ## 假设与默认值
 
 - 本文档只服务于 v1 当前实现计划，不展开未来 `ToolRegistry`、`AgentOrchestrator`、`QQOfficialAdapter` 的实施拆分。

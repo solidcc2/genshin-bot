@@ -71,3 +71,35 @@ def test_invalid_config_shape_raises(tmp_path):
 def test_invalid_shutdown_timeout_raises():
     with pytest.raises(ConfigError, match="APP_HTTP_SHUTDOWN_TIMEOUT must be a number"):
         ConfigLoader.load(environ={"APP_HTTP_SHUTDOWN_TIMEOUT": "abc"})
+
+
+def test_invalid_storage_backend_raises(tmp_path):
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        json.dumps({
+            "app_name": "test",
+            "environment": "test",
+            "log_level": "INFO",
+            "http": {"host": "0.0.0.0", "port": 8080, "health_path": "/healthz", "shutdown_timeout": 5.0},
+            "storage": {"backend": "redis"},
+        }),
+        encoding="utf-8",
+    )
+    with pytest.raises(ConfigError, match="storage.backend must be 'memory' or 'sqlite'"):
+        ConfigLoader.load(config_path=config_path, environ={})
+
+
+def test_sqlite_without_db_path_raises(tmp_path):
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        json.dumps({
+            "app_name": "test",
+            "environment": "test",
+            "log_level": "INFO",
+            "http": {"host": "0.0.0.0", "port": 8080, "health_path": "/healthz", "shutdown_timeout": 5.0},
+            "storage": {"backend": "sqlite", "db_path": ""},
+        }),
+        encoding="utf-8",
+    )
+    with pytest.raises(ConfigError, match="storage.db_path must be a non-empty string when backend is 'sqlite'"):
+        ConfigLoader.load(config_path=config_path, environ={})

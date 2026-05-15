@@ -23,8 +23,8 @@ class CLIMessageSender:
     async def send_reply(self, event: NormalizedEvent, text: str) -> str:
         return await self.send_text(self.reply_target, text)
 
-    def display_result(self, result: PluginResult | None) -> None:
-        if result is not None and result.text:
+    def display_result(self, result: PluginResult) -> None:
+        if result.text:
             print(result.text, file=sys.stdout)
 
 
@@ -41,6 +41,8 @@ class CLIAdapter:
         self._print_banner()
 
         while self._running:
+            sys.stdout.write("> ")
+            sys.stdout.flush()
             try:
                 line = await asyncio.to_thread(sys.stdin.readline)
             except (KeyboardInterrupt, EOFError):
@@ -66,8 +68,11 @@ class CLIAdapter:
                 text=text,
             )
 
-            result = await self._router.dispatch(event, self._sender)
-            self._sender.display_result(result)
+            try:
+                result = await self._router.dispatch(event, self._sender)
+                self._sender.display_result(result)
+            except Exception as exc:
+                print(f"错误: {exc}", file=sys.stderr)
 
     def stop(self) -> None:
         self._running = False

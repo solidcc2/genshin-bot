@@ -9,13 +9,15 @@ description = "QQ AI bot prototype runtime skeleton"
 requires-python = ">=3.10"
 dependencies = [
   "fastapi",
+  "genshin",
+  "qrcode[pil]",
   "uvicorn",
 ]
 
 [project.optional-dependencies]
 dev = [
-  "httpx",
   "pytest",
+  "httpx",
 ]
 
 [tool.pytest.ini_options]

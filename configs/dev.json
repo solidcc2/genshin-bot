@@ -8,5 +8,14 @@
     "health_path": "/healthz",
     "shutdown_timeout": 5.0
   },
-  "providers": {}
+  "storage": {
+    "backend": "sqlite",
+    "db_path": "data/bot.db"
+  },
+  "providers": {
+    "hoyolab": {
+      "qr_timeout": 120.0,
+      "region": "cn"
+    }
+  }
 }

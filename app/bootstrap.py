@@ -17,7 +17,11 @@ from app.logging import configure_logging
 from app.plugins.echo import EchoPlugin
 from app.plugins.help import HelpPlugin
 from app.plugins.ping import PingPlugin
+from app.rate_limit import RateLimiter
+from app.router import Router
 from app.runtime import AppContext
+from app.session import SessionManager
+from app.storage import create_storage
 
 
 class Application:
@@ -38,6 +42,10 @@ class Application:
             raise ApplicationStateError("Application is not in a stoppable state")
 
         await self._health_service.stop()
+
+        if self.context.storage is not None:
+            await self.context.storage.close()
+
         self.context.runtime.mark_stopped()
         self.context.logger.info("application stopped")
 
@@ -50,12 +58,21 @@ def build_application(
     config = ConfigLoader.load(config_path=config_path, environ=environ)
     logger = configure_logging(config.log_level)
     context = AppContext(config=config, logger=logger)
+    context.router = Router(context.plugins)
 
+    _init_storage(context)
     _register_builtin_plugins(context)
 
     health_service = HealthService(context, runner_factory=health_runner_factory)
     context.services.register("health_service", health_service)
     return Application(context=context, health_service=health_service)
+
+
+def _init_storage(context: AppContext) -> None:
+    storage = create_storage(context.config.storage)
+    context.storage = storage
+    context.session_manager = SessionManager(storage)
+    context.rate_limiter = RateLimiter(storage)
 
 
 def _register_builtin_plugins(context: AppContext) -> None:
@@ -64,8 +81,21 @@ def _register_builtin_plugins(context: AppContext) -> None:
     help_ = HelpPlugin(context.plugins)
 
     for plugin in (echo, ping, help_):
-        context.plugins.register(plugin)
         context.router.register(plugin)
+
+    _register_genshin_plugins(context)
+
+
+def _register_genshin_plugins(context: AppContext) -> None:
+    from app.plugins.genshin import register as register_genshin
+
+    provider = register_genshin(
+        router=context.router,
+        storage=context.storage,
+        hoyolab_config=context.config.hoyolab,
+    )
+    if provider is not None:
+        context.services.register("hoyolab_provider", provider)
 
 
 async def async_main(argv: list[str] | None = None) -> int:

@@ -8,7 +8,10 @@ from typing import Any
 from app.config import AppConfig
 from app.errors import ServiceRegistrationError
 from app.plugin import PluginRegistry
+from app.rate_limit import RateLimiter
 from app.router import Router
+from app.session import SessionManager
+from app.storage import StorageProvider
 
 
 class ServiceRegistry:
@@ -54,4 +57,7 @@ class AppContext:
     services: ServiceRegistry = field(default_factory=ServiceRegistry)
     runtime: RuntimeState = field(default_factory=RuntimeState)
     plugins: PluginRegistry = field(default_factory=PluginRegistry)
-    router: Router = field(default_factory=Router)
+    router: Router | None = None
+    storage: StorageProvider | None = None
+    session_manager: SessionManager | None = None
+    rate_limiter: RateLimiter | None = None

@@ -50,6 +50,9 @@ class Application:
         if self.context.services.has("onebot_adapter"):
             await self.context.services.get("onebot_adapter").stop()
 
+        if self.context.services.has("llm_provider"):
+            await self.context.services.get("llm_provider").close()
+
         await self._health_service.stop()
 
         if self.context.storage is not None:
@@ -109,9 +112,49 @@ def _register_core_plugins(context: AppContext) -> None:
         context.router.register(plugin)
 
     _register_genshin_plugins(context)
+    _register_chat_plugin(context)
 
     # NullPlugin must be registered last — its match() always returns True
     context.router.register(NullPlugin())
+
+
+def _register_chat_plugin(context: AppContext) -> None:
+    llm_config = context.config.llm
+    if not llm_config.enabled:
+        return
+    if not llm_config.api_key:
+        context.logger.warning("llm enabled but api_key not set, chat plugin skipped")
+        return
+
+    from app.llm import ContextBuilder, DeepSeekProvider, ModelRouter
+    from app.plugins.chat import ChatPlugin
+
+    assert context.session_manager is not None
+
+    provider = DeepSeekProvider(
+        api_key=llm_config.api_key,
+        endpoint=llm_config.endpoint,
+        timeout=llm_config.timeout,
+        max_retries=llm_config.max_retries,
+    )
+    model_router = ModelRouter(
+        default_model=llm_config.default_model,
+        upgrade_model=llm_config.upgrade_model,
+    )
+    context_builder = ContextBuilder(
+        persona=llm_config.system_prompt,
+        plugin_registry=context.plugins,
+    )
+
+    context.router.register(ChatPlugin(
+        provider=provider,
+        session_manager=context.session_manager,
+        context_builder=context_builder,
+        router=model_router,
+        temperature=llm_config.temperature,
+        max_tokens=llm_config.max_tokens,
+    ))
+    context.services.register("llm_provider", provider)
 
 
 def _register_genshin_plugins(context: AppContext) -> None:

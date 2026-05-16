@@ -52,3 +52,15 @@ class ApiError(HoyolabError):
 
 class NotBoundError(HoyolabError):
     """Raised when the user has no bound HoYoLAB cookies."""
+
+
+class LLMError(AppError):
+    """Base error for LLM provider operations."""
+
+
+class LLMConfigError(LLMError):
+    """Raised when LLM configuration is invalid."""
+
+
+class LLMAPIError(LLMError):
+    """Raised when the LLM API call fails."""

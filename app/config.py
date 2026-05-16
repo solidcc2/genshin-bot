@@ -33,6 +33,20 @@ class HoYoLABConfig:
 
 
 @dataclass(frozen=True)
+class LLMConfig:
+    enabled: bool = False
+    api_key: str = ""
+    endpoint: str = "https://api.deepseek.com/chat/completions"
+    default_model: str = "deepseek-v4-flash"
+    upgrade_model: str = "deepseek-v4-pro"
+    temperature: float = 0.7
+    max_tokens: int = 2048
+    system_prompt: str = "你是 genshen，一个智能 AI 助手。"
+    timeout: float = 60.0
+    max_retries: int = 3
+
+
+@dataclass(frozen=True)
 class OneBotConfig:
     enabled: bool = False
     webhook_host: str = "0.0.0.0"
@@ -50,6 +64,7 @@ class AppConfig:
     storage: StorageConfig
     hoyolab: HoYoLABConfig
     onebot: OneBotConfig
+    llm: LLMConfig
     providers: dict[str, Any]
 
 
@@ -101,6 +116,18 @@ class ConfigLoader:
                 "webhook_port": 18080,
                 "webhook_path": "/onebot/v11/",
                 "api_base": "http://127.0.0.1:3000",
+            },
+            "llm": {
+                "enabled": False,
+                "api_key": "",
+                "endpoint": "https://api.deepseek.com/chat/completions",
+                "default_model": "deepseek-v4-flash",
+                "upgrade_model": "deepseek-v4-pro",
+                "temperature": 0.7,
+                "max_tokens": 2048,
+                "system_prompt": "你是 genshen，一个智能 AI 助手。",
+                "timeout": 60.0,
+                "max_retries": 3,
             },
         }
 
@@ -182,6 +209,43 @@ class ConfigLoader:
         if "APP_ONEBOT_API_BASE" in environ:
             overrides.setdefault("onebot", {})["api_base"] = environ["APP_ONEBOT_API_BASE"]
 
+        if "APP_LLM_ENABLED" in environ:
+            overrides.setdefault("llm", {})["enabled"] = environ["APP_LLM_ENABLED"].lower() == "true"
+        if "APP_LLM_API_KEY" in environ:
+            overrides.setdefault("llm", {})["api_key"] = environ["APP_LLM_API_KEY"]
+        if "APP_LLM_ENDPOINT" in environ:
+            overrides.setdefault("llm", {})["endpoint"] = environ["APP_LLM_ENDPOINT"]
+        if "APP_LLM_DEFAULT_MODEL" in environ:
+            overrides.setdefault("llm", {})["default_model"] = environ["APP_LLM_DEFAULT_MODEL"]
+        if "APP_LLM_UPGRADE_MODEL" in environ:
+            overrides.setdefault("llm", {})["upgrade_model"] = environ["APP_LLM_UPGRADE_MODEL"]
+        if "APP_LLM_TEMPERATURE" in environ:
+            temp_value = environ["APP_LLM_TEMPERATURE"]
+            try:
+                overrides.setdefault("llm", {})["temperature"] = float(temp_value)
+            except ValueError as exc:
+                raise ConfigError(f"APP_LLM_TEMPERATURE must be a number: {temp_value}") from exc
+        if "APP_LLM_MAX_TOKENS" in environ:
+            tokens_value = environ["APP_LLM_MAX_TOKENS"]
+            try:
+                overrides.setdefault("llm", {})["max_tokens"] = int(tokens_value)
+            except ValueError as exc:
+                raise ConfigError(f"APP_LLM_MAX_TOKENS must be an integer: {tokens_value}") from exc
+        if "APP_LLM_SYSTEM_PROMPT" in environ:
+            overrides.setdefault("llm", {})["system_prompt"] = environ["APP_LLM_SYSTEM_PROMPT"]
+        if "APP_LLM_TIMEOUT" in environ:
+            timeout_value = environ["APP_LLM_TIMEOUT"]
+            try:
+                overrides.setdefault("llm", {})["timeout"] = float(timeout_value)
+            except ValueError as exc:
+                raise ConfigError(f"APP_LLM_TIMEOUT must be a number: {timeout_value}") from exc
+        if "APP_LLM_MAX_RETRIES" in environ:
+            retries_value = environ["APP_LLM_MAX_RETRIES"]
+            try:
+                overrides.setdefault("llm", {})["max_retries"] = int(retries_value)
+            except ValueError as exc:
+                raise ConfigError(f"APP_LLM_MAX_RETRIES must be an integer: {retries_value}") from exc
+
         return overrides
 
     @classmethod
@@ -245,6 +309,10 @@ class ConfigLoader:
         if not isinstance(onebot_raw, dict):
             raise ConfigError("onebot must be an object")
 
+        llm_raw = raw.get("llm", {})
+        if not isinstance(llm_raw, dict):
+            raise ConfigError("llm must be an object")
+
         return AppConfig(
             app_name=app_name.strip(),
             environment=environment.strip(),
@@ -269,6 +337,18 @@ class ConfigLoader:
                 webhook_port=int(onebot_raw.get("webhook_port", 18080)),
                 webhook_path=str(onebot_raw.get("webhook_path", "/onebot/v11/")),
                 api_base=str(onebot_raw.get("api_base", "http://127.0.0.1:3000")),
+            ),
+            llm=LLMConfig(
+                enabled=bool(llm_raw.get("enabled", False)),
+                api_key=str(llm_raw.get("api_key", "")),
+                endpoint=str(llm_raw.get("endpoint", "https://api.deepseek.com/chat/completions")),
+                default_model=str(llm_raw.get("default_model", "deepseek-v4-flash")),
+                upgrade_model=str(llm_raw.get("upgrade_model", "deepseek-v4-pro")),
+                temperature=float(llm_raw.get("temperature", 0.7)),
+                max_tokens=int(llm_raw.get("max_tokens", 2048)),
+                system_prompt=str(llm_raw.get("system_prompt", "")),
+                timeout=float(llm_raw.get("timeout", 60.0)),
+                max_retries=int(llm_raw.get("max_retries", 3)),
             ),
             providers=providers,
         )

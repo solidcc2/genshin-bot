@@ -24,5 +24,10 @@
     "webhook_port": 18080,
     "webhook_path": "/onebot/v11/",
     "api_base": "http://127.0.0.1:3000"
+  },
+  "llm": {
+    "enabled": false,
+    "api_key": "",
+    "system_prompt": "你是 genshen，一个智能 AI 助手。"
   }
 }

@@ -306,6 +306,7 @@ class StaticDataProvider:
         self._bosses: dict[str, dict[str, Any]] = {}
         self._characters_extra: dict[str, dict[str, Any]] = {}
         self._loaded = False
+        self.load()
 
     def load(self) -> None:
         if self._loaded:

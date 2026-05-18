@@ -1,3 +1,4 @@
+from app.event_model import NormalizedEvent
 from app.plugin import BotPlugin, PluginContext, PluginResult
 
 
@@ -9,7 +10,7 @@ class NullPlugin(BotPlugin):
     "unknown command" hint, OneBot silently ignores it.
     """
 
-    def match(self, event: object) -> bool:
+    def match(self, event: NormalizedEvent) -> bool:
         return True
 
     async def handle(self, ctx: PluginContext) -> PluginResult:

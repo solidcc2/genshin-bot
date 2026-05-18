@@ -5,7 +5,7 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
-from fastapi import Body, FastAPI
+from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 import uvicorn
 
@@ -129,16 +129,5 @@ def create_health_app(context: AppContext) -> FastAPI:
     @app.get(context.config.http.health_path)
     async def healthz() -> JSONResponse:
         return JSONResponse(build_health_payload(context))
-
-    @app.post("/api/llm/refresh")
-    async def llm_refresh(body: dict[str, object] = Body(...)) -> JSONResponse:
-        chat_id = body.get("chat_id")
-        if not isinstance(chat_id, str) or not chat_id.strip():
-            return JSONResponse({"error": "chat_id required"}, status_code=400)
-        sm = context.session_manager
-        if sm is None:
-            return JSONResponse({"error": "session manager not available"}, status_code=503)
-        await sm.clear_messages(chat_id)
-        return JSONResponse({"status": "ok", "chat_id": chat_id})
 
     return app

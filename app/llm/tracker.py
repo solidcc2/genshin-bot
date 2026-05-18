@@ -1,8 +1,14 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import datetime, timezone, timedelta
 
 from app.storage import StorageProvider
+
+_TZ_CN = timezone(timedelta(hours=8))
+
+
+def _today_cn() -> str:
+    return datetime.now(_TZ_CN).date().isoformat()
 
 
 class TokenUsageTracker:
@@ -32,7 +38,7 @@ class TokenUsageTracker:
         """Return True if still under all configured limits."""
         if not self.has_limits():
             return True
-        daily_key = date.today().isoformat()
+        daily_key = _today_cn()
         if self._max_per_day > 0:
             used = await self._storage.get(self._DAILY_NS, daily_key) or 0
             if used >= self._max_per_day:
@@ -45,7 +51,7 @@ class TokenUsageTracker:
 
     async def record(self, tokens: int) -> None:
         """Record token usage after a successful LLM call."""
-        daily_key = date.today().isoformat()
+        daily_key = _today_cn()
         daily_used = await self._storage.get(self._DAILY_NS, daily_key) or 0
         await self._storage.set(self._DAILY_NS, daily_key, daily_used + tokens)
 
@@ -53,7 +59,7 @@ class TokenUsageTracker:
         await self._storage.set(self._TOTAL_NS, self._TOTAL_KEY, total_used + tokens)
 
     async def daily_usage(self) -> int:
-        return await self._storage.get(self._DAILY_NS, date.today().isoformat()) or 0
+        return await self._storage.get(self._DAILY_NS, _today_cn()) or 0
 
     async def total_usage(self) -> int:
         return await self._storage.get(self._TOTAL_NS, self._TOTAL_KEY) or 0

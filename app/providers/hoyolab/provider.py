@@ -63,7 +63,7 @@ class HoYoLABProvider:
         self._region = _REGION_MAP.get(region, genshin.Region.CHINESE)
         self._region_str = region
         self._qr_timeout = qr_timeout
-        self._clients: dict[str, genshin.Client] = {}
+        self._client: genshin.Client | None = None
 
     @property
     def qr_timeout(self) -> float:
@@ -197,7 +197,6 @@ class HoYoLABProvider:
             return None
 
     async def bind(self, user_id: str, cookies: dict[str, str]) -> None:
-        self._clients.pop(user_id, None)
         device_id = _generate_device_id()
         uid = await self._resolve_uid(cookies, device_id=device_id)
         device_fp: str | None = None
@@ -221,30 +220,31 @@ class HoYoLABProvider:
         await self._storage.set(_NS_HOYOLAB, user_id, data)
 
     async def unbind(self, user_id: str) -> None:
-        self._clients.pop(user_id, None)
         await self._storage.delete(_NS_HOYOLAB, user_id)
 
-    def _make_client(self, session: _SessionData, user_id: str) -> genshin.Client:
-        cached = self._clients.get(user_id)
-        if cached is not None:
-            return cached
-        client = genshin.Client(region=self._region, device_id=session.get("device_id"))
-        client.device_fp = session.get("device_fp")
-        client.custom_headers = {
-            "User-Agent": _USER_AGENT,
-            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-            "x-rpc-app_version": "2.102.0",
-        }
-        client.set_cookies(session["cookies"])
-        self._clients[user_id] = client
-        return client
+    async def close(self) -> None:
+        if self._client is not None:
+            await self._client.close()
+            self._client = None
+
+    def _prepare_client(self, session: _SessionData) -> genshin.Client:
+        if self._client is None:
+            self._client = genshin.Client(region=self._region, device_id=session.get("device_id"))
+            self._client.device_fp = session.get("device_fp")
+            self._client.custom_headers = {
+                "User-Agent": _USER_AGENT,
+                "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+                "x-rpc-app_version": "2.102.0",
+            }
+        self._client.set_cookies(session["cookies"])
+        return self._client
 
     # --- notes ---
 
     async def get_notes(self, user_id: str) -> NotesResult:
         try:
             session = await self._ensure_session(user_id)
-            client = self._make_client(session, user_id)
+            client = self._prepare_client(session)
             raw = await client.get_notes(uid=int(session["uid"]) if session.get("uid") else None)
             return NotesResult(
                     data=NotesData(
@@ -270,7 +270,7 @@ class HoYoLABProvider:
     async def daily_sign(self, user_id: str) -> SignResult:
         try:
             session = await self._ensure_session(user_id)
-            client = self._make_client(session, user_id)
+            client = self._prepare_client(session)
             info = await client.get_reward_info(game=genshin.Game.GENSHIN)
             if info.signed_in:
                 return SignResult(
@@ -299,7 +299,7 @@ class HoYoLABProvider:
         try:
             session = await self._ensure_session(user_id)
             resolved_uid = uid or session.get("uid")
-            client = self._make_client(session, user_id)
+            client = self._prepare_client(session)
             raw = await client.get_genshin_user(uid=int(resolved_uid) if resolved_uid else None)
             return ChronicleResult(
                 data=ChronicleData(

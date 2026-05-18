@@ -53,6 +53,8 @@ class Application:
 
         if self.context.services.has("llm_provider"):
             await self.context.services.get("llm_provider").close()
+        if self.context.services.has("hoyolab_provider"):
+            await self.context.services.get("hoyolab_provider").close()
 
         await self._health_service.stop()
 
@@ -120,6 +122,7 @@ def _register_core_plugins(context: AppContext) -> None:
         context.router.register(plugin)
 
     _register_chat_log_admin_plugin(context)
+    _register_llm_refresh_plugin(context)
     _register_genshin_plugins(context)
     _register_chat_plugin(context)
     _register_staticdata_plugins(context)
@@ -133,6 +136,13 @@ def _register_chat_log_admin_plugin(context: AppContext) -> None:
 
     if context.chat_log is not None:
         context.router.register(ChatLogClearPlugin(context.chat_log))
+
+
+def _register_llm_refresh_plugin(context: AppContext) -> None:
+    from app.plugins.llm_refresh import LLMRefreshEnvPlugin
+
+    if context.session_manager is not None:
+        context.router.register(LLMRefreshEnvPlugin(context.session_manager))
 
 
 def _register_chat_plugin(context: AppContext) -> None:
@@ -193,7 +203,6 @@ def _register_chat_plugin(context: AppContext) -> None:
         temperature=llm_config.temperature,
         max_tokens=llm_config.max_tokens,
         signal_evaluator=signal_evaluator,
-        chat_log=context.chat_log,
     ))
     context.services.register("llm_provider", provider)
 

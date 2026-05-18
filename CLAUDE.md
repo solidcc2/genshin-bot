@@ -65,6 +65,10 @@ docs/                 # 架构文档
 - **CP2** — 统一事件模型与插件执行主线（NormalizedEvent、BotPlugin、Router）
 - CLI adapter 作为开发期工具，`--cli` 参数启动
 
+### 提交命名约定
+
+`CP`（Checkpoint）前缀仅用于既定的 checkpoint 计划提交。插入的优化、修复、重构等非计划内变更**不应**使用 `CP` 编号，直接用自然语言描述即可。
+
 ### 消息通道架构
 
 ```

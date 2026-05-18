@@ -54,3 +54,7 @@ class MessageSender(Protocol):
         """Send an image as reply."""
         target = ReplyTarget(scene=event.scene, chat_id=event.chat_id, user_id=event.user_id)
         return await self.send_image(target, image_data)
+
+    async def recall(self, message_id: str) -> bool:
+        """Recall/delete a previously sent message. Default no-op."""
+        return False

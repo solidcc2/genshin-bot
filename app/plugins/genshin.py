@@ -24,8 +24,8 @@ class HoyobindPlugin(BotPlugin):
 
         session = await self._provider.start_qr_login()
 
-        await ctx.sender.send_reply_image(ctx.event, session.qr_image)
-        await ctx.sender.send_reply(
+        img_msg_id = await ctx.sender.send_reply_image(ctx.event, session.qr_image)
+        txt_msg_id = await ctx.sender.send_reply(
             ctx.event,
             f"正在等待扫码...（超时 {int(self._provider.qr_timeout)} 秒）",
         )
@@ -33,6 +33,12 @@ class HoyobindPlugin(BotPlugin):
         result = await self._provider.poll_qr_login(
             session.ticket, session.device_id, timeout=self._provider.qr_timeout
         )
+
+        # Best-effort recall of QR code messages
+        if img_msg_id:
+            await ctx.sender.recall(img_msg_id)
+        if txt_msg_id:
+            await ctx.sender.recall(txt_msg_id)
 
         if result.status == QRLoginStatus.CONFIRMED and result.cookies:
             await self._provider.bind(user_id, result.cookies)

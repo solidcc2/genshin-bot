@@ -87,28 +87,36 @@ class OneBotMessageSender:
             payload["user_id"] = int(target.chat_id)
         return payload
 
-    async def _post_with_retry(self, payload: dict[str, Any], max_retries: int = 3) -> dict[str, Any]:
+    async def _post_with_retry(self, endpoint: str, payload: dict[str, Any], max_retries: int = 3) -> dict[str, Any]:
         last_exc: Exception | None = None
         for attempt in range(max_retries + 1):
             try:
-                resp = await self._client.post(f"{self._api_base}/send_msg", json=payload)
+                resp = await self._client.post(f"{self._api_base}{endpoint}", json=payload)
                 resp.raise_for_status()
                 return resp.json()
             except Exception as exc:
                 last_exc = exc
                 if attempt < max_retries:
                     wait = 2 ** attempt
-                    _logger.warning("send_msg attempt %d failed: %s, retrying in %ds", attempt + 1, exc, wait)
+                    _logger.warning("%s attempt %d failed: %s, retrying in %ds", endpoint, attempt + 1, exc, wait)
                     await asyncio.sleep(wait)
-        _logger.error("send_msg failed after %d attempts: %s", max_retries + 1, last_exc)
+        _logger.error("%s failed after %d attempts: %s", endpoint, max_retries + 1, last_exc)
         raise last_exc  # type: ignore[misc]
 
     async def send_text(self, target: ReplyTarget, text: str) -> str:
         payload = self._build_payload(target, text)
-        data = await self._post_with_retry(payload)
+        data = await self._post_with_retry("/send_msg", payload)
         if data.get("retcode") != 0:
             _logger.warning("send_msg retcode=%s: %s", data.get("retcode"), data.get("msg", ""))
         return str(data.get("data", {}).get("message_id", ""))
+
+    async def recall(self, message_id: str) -> bool:
+        try:
+            data = await self._post_with_retry("/delete_msg", {"message_id": message_id}, max_retries=1)
+            return data.get("retcode") == 0
+        except Exception:
+            _logger.warning("recall failed for message_id=%s", message_id, exc_info=True)
+            return False
 
     async def send_reply(self, event: NormalizedEvent, text: str) -> str:
         target = ReplyTarget(

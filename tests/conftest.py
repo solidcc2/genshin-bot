@@ -35,6 +35,9 @@ class FakeSender:
     async def send_reply_image(self, event, image_data: bytes) -> str:
         return "fake_image_id"
 
+    async def recall(self, message_id: str) -> bool:
+        return False
+
 
 class FakeModelProvider:
     def __init__(self, response: str | None = None) -> None:

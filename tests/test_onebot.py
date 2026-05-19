@@ -10,16 +10,16 @@ class TestStripCQCodes:
     def test_no_cq_codes(self) -> None:
         assert _strip_cq_codes("hello world") == "hello world"
 
-    def test_strips_at_mention(self) -> None:
+    def test_preserves_at_mention(self) -> None:
         raw = "[CQ:at,qq=123456] 你好"
-        assert _strip_cq_codes(raw) == "你好"
+        assert _strip_cq_codes(raw) == "@123456 你好"
 
-    def test_strips_multiple_cq_codes(self) -> None:
+    def test_strips_non_at_cq_codes(self) -> None:
         raw = "[CQ:at,qq=111] [CQ:face,id=123] 测试消息 [CQ:image,file=abc.jpg]"
-        assert _strip_cq_codes(raw) == "测试消息"
+        assert _strip_cq_codes(raw) == "@111 测试消息"
 
-    def test_only_cq_codes_returns_empty(self) -> None:
-        assert _strip_cq_codes("[CQ:at,qq=1]") == ""
+    def test_only_cq_codes_returns_at_only(self) -> None:
+        assert _strip_cq_codes("[CQ:at,qq=1]") == "@1"
 
     def test_empty_string(self) -> None:
         assert _strip_cq_codes("") == ""
@@ -109,7 +109,7 @@ class TestParseEvent:
             }
         )
         assert event is not None
-        assert event.text == "签到"
+        assert event.text == "@2 签到"
 
 
 class TestOneBotMessageSender:

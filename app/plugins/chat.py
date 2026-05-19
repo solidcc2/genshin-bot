@@ -19,20 +19,34 @@ if TYPE_CHECKING:
 
 _logger = logging.getLogger(__name__)
 
-_RESPONSE_PATTERN = re.compile(r"^\s*(是|否)\s*,\s*\+?(\d+)\s*s\s*,?\s*(.*)", re.DOTALL)
+_RESPONSE_PATTERN = re.compile(
+    r"^\s*(是|否)\s*[,，]\s*\+?(\d+)\s*s\s*[,，]?\s*(.*)", re.DOTALL
+)
+_RELAXED_PATTERN = re.compile(r"^\s*\+?(\d+)\s*s\s*[,，]?\s*(.*)", re.DOTALL)
 
 
 def _parse_response(text: str) -> tuple[bool, int, str]:
     """Parse LLM response into (should_reply, delay_seconds, content).
 
-    On no-match or explicit 否: returns (False, 0, "").
+    Three-tier parsing:
+      1. Strict: "是/否, +Ns, 内容" with Chinese/English commas
+      2. Relaxed: "+Ns, 内容" (missing 是/否 prefix)
+      3. Fallback: bare "否" → no reply; anything else → reply with 0 delay
     """
-    m = _RESPONSE_PATTERN.match(text.strip())
-    if not m:
+    raw = text.strip()
+    if not raw:
         return False, 0, ""
-    if m.group(1) == "否":
+    m = _RESPONSE_PATTERN.match(raw)
+    if m:
+        if m.group(1) == "否":
+            return False, 0, ""
+        return True, int(m.group(2)), m.group(3).strip()
+    relaxed = _RELAXED_PATTERN.match(raw)
+    if relaxed:
+        return True, int(relaxed.group(1)), relaxed.group(2).strip()
+    if raw == "否":
         return False, 0, ""
-    return True, int(m.group(2)), m.group(3).strip()
+    return True, 0, raw
 
 
 class ChatPlugin(BotPlugin):
@@ -78,6 +92,7 @@ class ChatPlugin(BotPlugin):
         session = await self._session_manager.get_or_create(chat_id)
         cursor_msg_id = session.state.get("llm_context_since_msg")
         llm_messages = await self._context_builder.build(ctx.event, cursor_msg_id=cursor_msg_id)
+        _logger.debug("llm prompt for chat=%s: %s", chat_id, llm_messages)
         model = self._router.select_model(user_text)
 
         try:
@@ -90,6 +105,8 @@ class ChatPlugin(BotPlugin):
         except LLMError as exc:
             _logger.warning("llm generation failed for chat=%s: %s", chat_id, exc)
             return PluginResult(text=f"抱歉，我现在无法回答。{exc}")
+
+        _logger.info("llm raw response for chat=%s: %s", chat_id, result.text)
 
         if self._tracker is not None:
             await self._tracker.record(result.usage.total_tokens)

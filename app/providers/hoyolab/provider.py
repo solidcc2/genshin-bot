@@ -223,9 +223,7 @@ class HoYoLABProvider:
         await self._storage.delete(_NS_HOYOLAB, user_id)
 
     async def close(self) -> None:
-        if self._client is not None:
-            await self._client.close()
-            self._client = None
+        self._client = None
 
     def _prepare_client(self, session: _SessionData) -> genshin.Client:
         if self._client is None:

@@ -56,12 +56,12 @@ class TestParseResponse:
         assert delay == 0
         assert content == ""
 
-    def test_non_matching_text_returns_no_reply(self) -> None:
+    def test_sends_plain_text_without_format(self) -> None:
         from app.plugins.chat import _parse_response
         reply, delay, content = _parse_response("普通句子没有格式")
-        assert reply is False
+        assert reply is True
         assert delay == 0
-        assert content == ""
+        assert content == "普通句子没有格式"
 
     def test_empty_text_returns_no_reply(self) -> None:
         from app.plugins.chat import _parse_response
@@ -69,6 +69,55 @@ class TestParseResponse:
         assert reply is False
         assert delay == 0
         assert content == ""
+
+    def test_chinese_comma(self) -> None:
+        from app.plugins.chat import _parse_response
+        reply, delay, content = _parse_response("是，+0s，今天天气不错")
+        assert reply is True
+        assert delay == 0
+        assert content == "今天天气不错"
+
+    def test_chinese_comma_with_delay(self) -> None:
+        from app.plugins.chat import _parse_response
+        reply, delay, content = _parse_response("是，+5s，稍等")
+        assert reply is True
+        assert delay == 5
+        assert content == "稍等"
+
+    def test_chinese_comma_no_reply(self) -> None:
+        from app.plugins.chat import _parse_response
+        reply, delay, content = _parse_response("否，+0s，")
+        assert reply is False
+        assert delay == 0
+        assert content == ""
+
+    def test_relaxed_format_missing_prefix(self) -> None:
+        from app.plugins.chat import _parse_response
+        reply, delay, content = _parse_response("+0s, 直接回复")
+        assert reply is True
+        assert delay == 0
+        assert content == "直接回复"
+
+    def test_relaxed_format_with_delay(self) -> None:
+        from app.plugins.chat import _parse_response
+        reply, delay, content = _parse_response("+5s, 稍等回复")
+        assert reply is True
+        assert delay == 5
+        assert content == "稍等回复"
+
+    def test_relaxed_format_chinese_comma(self) -> None:
+        from app.plugins.chat import _parse_response
+        reply, delay, content = _parse_response("+3s，内容")
+        assert reply is True
+        assert delay == 3
+        assert content == "内容"
+
+    def test_bare_yes_sends_text(self) -> None:
+        from app.plugins.chat import _parse_response
+        reply, delay, content = _parse_response("是")
+        assert reply is True
+        assert delay == 0
+        assert content == "是"
 
 
 class TestChatPluginMatch:
@@ -168,13 +217,29 @@ class TestChatPluginHandle:
         result = await plugin.handle(ctx)
         assert result.text is None
 
-    async def test_does_not_send_non_matching_text(self) -> None:
+    async def test_sends_plain_text_without_format(self) -> None:
         plugin = _make_chat_plugin("一些随机的非格式文本")
         event = make_event("你好")
         sender = FakeSender()
         ctx = PluginContext(event=event, sender=sender)
         result = await plugin.handle(ctx)
-        assert result.text is None
+        assert result.text == "一些随机的非格式文本"
+
+    async def test_relaxed_format_missing_prefix(self) -> None:
+        plugin = _make_chat_plugin("+0s, 直接回复")
+        event = make_event("你好")
+        sender = FakeSender()
+        ctx = PluginContext(event=event, sender=sender)
+        result = await plugin.handle(ctx)
+        assert result.text == "直接回复"
+
+    async def test_relaxed_format_chinese_comma(self) -> None:
+        plugin = _make_chat_plugin("+3s，稍等回复")
+        event = make_event("你好")
+        sender = FakeSender()
+        ctx = PluginContext(event=event, sender=sender)
+        result = await plugin.handle(ctx)
+        assert result.text == "稍等回复"
 
     async def test_chat_isolation(self) -> None:
         storage = MemoryStorage()

@@ -190,15 +190,13 @@ def _register_chat_plugin(context: AppContext) -> None:
         signals=llm_config.signals,
     )
 
-    tracker = None
-    if llm_config.max_tokens_per_day > 0 or llm_config.max_tokens_total > 0:
-        from app.llm.tracker import TokenUsageTracker
+    from app.llm.tracker import TokenUsageTracker
 
-        tracker = TokenUsageTracker(
-            storage=context.storage,
-            max_per_day=llm_config.max_tokens_per_day,
-            max_total=llm_config.max_tokens_total,
-        )
+    tracker = TokenUsageTracker(
+        storage=context.storage,
+        max_per_day=llm_config.max_tokens_per_day,
+        max_total=llm_config.max_tokens_total,
+    )
 
     context.router.register(ChatPlugin(
         provider=provider,

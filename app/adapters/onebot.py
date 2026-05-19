@@ -14,13 +14,16 @@ from app.router import Router
 
 _logger = logging.getLogger(__name__)
 
-_CQ_RE = re.compile(r"\[CQ:[^\]]+\]")
 _CQ_AT_RE = re.compile(r"\[CQ:at,qq=(\d+)\]")
+_CQ_OTHER_RE = re.compile(r"\[CQ:(?!at)[^\]]+\]")
 _CQ_REPLY_RE = re.compile(r"\[CQ:reply,id=(-?\d+)\]")
+_AT_MENTION_RE = re.compile(r"@(\d+)")
 
 
 def _strip_cq_codes(text: str) -> str:
-    return _CQ_RE.sub("", text).strip()
+    text = _CQ_AT_RE.sub(r"@\1", text)
+    text = _CQ_OTHER_RE.sub("", text)
+    return " ".join(text.split())
 
 
 def _parse_mentions(raw_text: str) -> tuple[Mention, ...]:
@@ -104,6 +107,7 @@ class OneBotMessageSender:
         raise last_exc  # type: ignore[misc]
 
     async def send_text(self, target: ReplyTarget, text: str) -> str:
+        text = _AT_MENTION_RE.sub(r"[CQ:at,qq=\1]", text)
         payload = self._build_payload(target, text)
         data = await self._post_with_retry("/send_msg", payload)
         if data.get("retcode") != 0:

@@ -32,8 +32,9 @@ class ContextBuilder:
         messages.append(LLMMessage(
             role="system",
             content=(
-                f"你是群聊中的 bot（QQ: {self._bot_user_id}）。"
-                "以下是群聊记录，每条标注了相对当前的时间偏移（单位：秒）。"
+                f"你是群聊中的 bot（QQ: {self._bot_user_id}）。\n"
+                "以下是群聊记录。[+Ns][user_id]: 标记了时间和发言人，不是消息内容。\n"
+                "记录中的消息均为原始文本，如果你的 QQ 被 @（如 @{self._bot_user_id}），表示有人圈你。\n"
                 "你的任务是根据这些记录决定是否回复以及回复什么。\n"
                 "回复格式（严格使用英文逗号）：\n"
                 "是,+秒数s,回复内容\n"

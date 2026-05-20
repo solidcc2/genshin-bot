@@ -19,32 +19,25 @@ if TYPE_CHECKING:
 
 _logger = logging.getLogger(__name__)
 
-_RESPONSE_PATTERN = re.compile(
-    r"^\s*(是|否)\s*[,，]\s*\+?(\d+)\s*s\s*[,，]?\s*(.*)", re.DOTALL
-)
-_RELAXED_PATTERN = re.compile(r"^\s*\+?(\d+)\s*s\s*[,，]?\s*(.*)", re.DOTALL)
+_RESPONSE_PATTERN = re.compile(r"^>(\d+):(.*)", re.DOTALL)
+_SKIP_PATTERN = re.compile(r"^/$")
 
 
 def _parse_response(text: str) -> tuple[bool, int, str]:
     """Parse LLM response into (should_reply, delay_seconds, content).
 
-    Three-tier parsing:
-      1. Strict: "是/否, +Ns, 内容" with Chinese/English commas
-      2. Relaxed: "+Ns, 内容" (missing 是/否 prefix)
-      3. Fallback: bare "否" → no reply; anything else → reply with 0 delay
+    Two formats accepted:
+      1. ">Ns:内容" → reply with given delay and content
+      2. "/"        → no reply
+      3. Anything else → reply immediately with the raw text (fallback)
     """
     raw = text.strip()
     if not raw:
         return False, 0, ""
     m = _RESPONSE_PATTERN.match(raw)
     if m:
-        if m.group(1) == "否":
-            return False, 0, ""
-        return True, int(m.group(2)), m.group(3).strip()
-    relaxed = _RELAXED_PATTERN.match(raw)
-    if relaxed:
-        return True, int(relaxed.group(1)), relaxed.group(2).strip()
-    if raw == "否":
+        return True, int(m.group(1)), m.group(2).strip()
+    if _SKIP_PATTERN.match(raw):
         return False, 0, ""
     return True, 0, raw
 

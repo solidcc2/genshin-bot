@@ -30,28 +30,21 @@ def _make_chat_plugin(response: str | None = None) -> ChatPlugin:
 class TestParseResponse:
     def test_formatted_reply(self) -> None:
         from app.plugins.chat import _parse_response
-        reply, delay, content = _parse_response("是, +0s, 今天天气不错")
+        reply, delay, content = _parse_response(">0:今天天气不错")
         assert reply is True
         assert delay == 0
         assert content == "今天天气不错"
 
     def test_formatted_reply_with_delay(self) -> None:
         from app.plugins.chat import _parse_response
-        reply, delay, content = _parse_response("是, +5s, 稍等")
+        reply, delay, content = _parse_response(">5:稍等")
         assert reply is True
         assert delay == 5
         assert content == "稍等"
 
-    def test_bare_no_returns_no_reply(self) -> None:
+    def test_skip_returns_no_reply(self) -> None:
         from app.plugins.chat import _parse_response
-        reply, delay, content = _parse_response("否")
-        assert reply is False
-        assert delay == 0
-        assert content == ""
-
-    def test_formatted_no_returns_no_reply(self) -> None:
-        from app.plugins.chat import _parse_response
-        reply, delay, content = _parse_response("否, +0s, ")
+        reply, delay, content = _parse_response("/")
         assert reply is False
         assert delay == 0
         assert content == ""
@@ -70,54 +63,26 @@ class TestParseResponse:
         assert delay == 0
         assert content == ""
 
-    def test_chinese_comma(self) -> None:
+    def test_skip_with_whitespace(self) -> None:
         from app.plugins.chat import _parse_response
-        reply, delay, content = _parse_response("是，+0s，今天天气不错")
-        assert reply is True
-        assert delay == 0
-        assert content == "今天天气不错"
-
-    def test_chinese_comma_with_delay(self) -> None:
-        from app.plugins.chat import _parse_response
-        reply, delay, content = _parse_response("是，+5s，稍等")
-        assert reply is True
-        assert delay == 5
-        assert content == "稍等"
-
-    def test_chinese_comma_no_reply(self) -> None:
-        from app.plugins.chat import _parse_response
-        reply, delay, content = _parse_response("否，+0s，")
+        reply, delay, content = _parse_response("  /  ")
         assert reply is False
         assert delay == 0
         assert content == ""
 
-    def test_relaxed_format_missing_prefix(self) -> None:
+    def test_formatted_reply_with_content_after_colon(self) -> None:
         from app.plugins.chat import _parse_response
-        reply, delay, content = _parse_response("+0s, 直接回复")
-        assert reply is True
-        assert delay == 0
-        assert content == "直接回复"
-
-    def test_relaxed_format_with_delay(self) -> None:
-        from app.plugins.chat import _parse_response
-        reply, delay, content = _parse_response("+5s, 稍等回复")
-        assert reply is True
-        assert delay == 5
-        assert content == "稍等回复"
-
-    def test_relaxed_format_chinese_comma(self) -> None:
-        from app.plugins.chat import _parse_response
-        reply, delay, content = _parse_response("+3s，内容")
+        reply, delay, content = _parse_response(">3:  有空格的回复  ")
         assert reply is True
         assert delay == 3
-        assert content == "内容"
+        assert content == "有空格的回复"
 
-    def test_bare_yes_sends_text(self) -> None:
+    def test_formatted_reply_multiline_content(self) -> None:
         from app.plugins.chat import _parse_response
-        reply, delay, content = _parse_response("是")
+        reply, delay, content = _parse_response(">0:第一行\n第二行")
         assert reply is True
         assert delay == 0
-        assert content == "是"
+        assert content == "第一行\n第二行"
 
 
 class TestChatPluginMatch:
@@ -145,7 +110,7 @@ class TestChatPluginMatch:
 @pytest.mark.anyio
 class TestChatPluginHandle:
     async def test_returns_llm_response(self) -> None:
-        plugin = _make_chat_plugin("是, +0s, 测试回复")
+        plugin = _make_chat_plugin(">0:测试回复")
         event = make_event("你好")
         sender = FakeSender()
         ctx = PluginContext(event=event, sender=sender)
@@ -169,7 +134,7 @@ class TestChatPluginHandle:
         storage = MemoryStorage()
         session_manager = SessionManager(storage)
         plugins = PluginRegistry()
-        provider = FakeModelProvider("是, +0s, OK")
+        provider = FakeModelProvider(">0:OK")
         context_builder = ContextBuilder(persona="test", plugin_registry=plugins)
         router = ModelRouter()
         plugin = ChatPlugin(
@@ -210,7 +175,7 @@ class TestChatPluginHandle:
         assert "抱歉" in (result.text or "")
 
     async def test_does_not_send_bare_no(self) -> None:
-        plugin = _make_chat_plugin("否")
+        plugin = _make_chat_plugin("/")
         event = make_event("你好")
         sender = FakeSender()
         ctx = PluginContext(event=event, sender=sender)
@@ -225,27 +190,11 @@ class TestChatPluginHandle:
         result = await plugin.handle(ctx)
         assert result.text == "一些随机的非格式文本"
 
-    async def test_relaxed_format_missing_prefix(self) -> None:
-        plugin = _make_chat_plugin("+0s, 直接回复")
-        event = make_event("你好")
-        sender = FakeSender()
-        ctx = PluginContext(event=event, sender=sender)
-        result = await plugin.handle(ctx)
-        assert result.text == "直接回复"
-
-    async def test_relaxed_format_chinese_comma(self) -> None:
-        plugin = _make_chat_plugin("+3s，稍等回复")
-        event = make_event("你好")
-        sender = FakeSender()
-        ctx = PluginContext(event=event, sender=sender)
-        result = await plugin.handle(ctx)
-        assert result.text == "稍等回复"
-
     async def test_chat_isolation(self) -> None:
         storage = MemoryStorage()
         session_manager = SessionManager(storage)
         plugins = PluginRegistry()
-        provider = FakeModelProvider("是, +0s, reply")
+        provider = FakeModelProvider(">0:reply")
         context_builder = ContextBuilder(persona="test", plugin_registry=plugins)
         router = ModelRouter()
         plugin = ChatPlugin(

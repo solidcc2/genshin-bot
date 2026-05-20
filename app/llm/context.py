@@ -28,17 +28,27 @@ class ContextBuilder:
         now = datetime.now(tz=timezone.utc)
         messages: list[LLMMessage] = []
 
-        # Layer 0: 身份声明 + 响应格式
+        # Layer 0: 身份声明 + 响应格式 + few-shot 示例
         messages.append(LLMMessage(
             role="system",
             content=(
-                f"你是群聊中的 bot（ID: {self._bot_user_id}）。\n"
-                "以下是群聊记录。[+Ns][user_id]: 标记了时间和发言人，不是消息内容。\n"
-                f"记录中的消息均为原始文本，如果你的 ID 被 @（如 @{self._bot_user_id}），表示有人圈你。\n"
-                "你的任务是根据这些记录决定是否回复以及回复什么。\n"
-                "回复格式（严格使用英文逗号）：\n"
-                "是,+秒数s,回复内容\n"
-                "否"
+                f"你是一个群聊机器人（ID: {self._bot_user_id}）。\n"
+                "\n"
+                "以下是群聊记录。每条格式为：\n"
+                "[{delta}s][{user_id}]: {text}\n"
+                "记录中的消息是原始文本。你的 ID 被 @ 表示有人圈你。\n"
+                "\n"
+                "根据群聊记录决定是否回复以及回复什么。\n"
+                "\n"
+                "回复格式：\n"
+                ">数字:内容    ← 回复，数字为延迟秒数\n"
+                "/            ← 不回复\n"
+                "\n"
+                "示例：\n"
+                "历史：[+120s][u_a]: xxxxx\n"
+                "回复：>3:xxxxx\n"
+                "历史：[+200s][u_b]: yyyyy\n"
+                "回复：/"
             ),
         ))
 
